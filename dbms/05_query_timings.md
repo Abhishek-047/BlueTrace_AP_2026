@@ -19,7 +19,7 @@ Every query of [`04_queries.sql`](04_queries.sql) (16 READ, 11 WRITE), timed wit
 - each one **measured from the app's own raster layers** (`readSite()`: distances, water history, height above drainage, upstream area), **judged by `decide()`** and **traced downhill with `traceDownstream()`** over the MERIT flow directions;
 - a quarter of them certified, with the real FNV-1a digest of the canonical record.
 
-The 100,000 generated checks are 56.1% REFER, 37.0% NO_OBJECTION, 4.4% REJECT and 2.5% CONDITIONS (518 fall outside the study area), and all 11 reason codes occur. With the app's 9 examples the database holds 100,009 screenings, 145,007 reasons, 876,867 route steps (8.9 per traced route on average, at most 38; 94,958 routes end at a trunk channel), 25,296 certificates and 59,942 citations. All 25,296 certificates pass the verification of query R14. The database grew from 11 MB to 171 MB, about 1.6 kB per plot check (route steps 77 MB, reasons 41 MB, screenings 20 MB, citations 17 MB, certificates 4.5 MB, each with its indexes).
+The 100,000 generated checks are 56.1% REFER, 37.0% NO_OBJECTION, 4.4% REJECT and 2.5% CONDITIONS (518 fall outside the study area), and all 11 reason codes occur. With the app's 9 examples the database holds 100,009 screenings, 145,007 reasons, 876,867 route steps (8.9 per traced route on average, at most 38; 94,958 routes end at a trunk channel), 25,296 certificates and 59,942 citations. All 25,296 certificates pass the verification of query R14. The database grew from 11 MB to 171 MB, about 1.6 kB per plot check (route steps 77 MB, reasons 41 MB, screenings 20 MB, citations 17 MB, certificates 4.5 MB, each with its indexes). Section 7 runs the app's own code on every one of them and gets the same rows.
 
 ## 2. Timing table
 
@@ -147,7 +147,33 @@ So in a deployed app, with a connection pool and prepared statements, these quer
 | A sequence is not rolled back: every W2 run of our timing passes used up a certificate number although its transaction was rolled back. | After all passes, `certificate_seq` stands at 25,309 for 25,296 certificates: 13 numbers that will never appear on paper. The app's `localStorage` counter has the same property. | Documented. If the desk needs numbers without gaps, the counter has to become a row updated in the issuing transaction, which serialises certificate issue. |
 | Planning outweighs execution for most reads. | End-to-end latency on a fresh connection is about three times the reported execution time for reads. | Recommendation: prepared statements and a connection pool (section 5). |
 
-## 7. Reproduce
+## 7. Checked against the app
+
+The 100,000 plot checks are only as faithful as the Python ports that produced them ([`bluetrace_logic.py`](bluetrace_logic.py)), so [`check_ports.py`](check_ports.py) runs the app's own JavaScript, `index.html` in headless Chromium, on the same inputs and compares the results. With `--db` it also checks the database itself.
+
+| Compared with the app | Cases | Result |
+|-----------------------|------:|--------|
+| `readSite()`: the six measured fields, at plots sampled the way the generator samples them | 5,000 | identical |
+| `traceDownstream()`, step by step: direction, length, upstream area, height above drainage | 5,000 plots, 44,741 steps | identical |
+| `decide()`: verdict, codes and wording, including a grid of values on every threshold | 15,000 | identical |
+| `sig2()`, `decodeUpa()`, `fnv1a()` and the parameters after `reconcileParams()` | 5,242 + 256 + 366 + 17 | identical, after the three fixes below |
+| Every certificate: the digest in its reference, PostgreSQL's `fnv1a()` of R14's canonical record, Python's, the app's | 25,296 | identical; every canonical record is ASCII |
+| Every generated plot check, through the app's `siteContext()`: measurements, upstream area, reasons, route | 100,000 | identical, except the reasons of 2 checks (below) |
+| R8, run as written for each of those checks, against the derived facts of `siteContext()` | 100,000 | identical |
+| R9, run as written, against the route totals of `traceDownstream()` | 98,080 routes | identical up to the two effects below |
+
+**Three fixes.** The check found three places where a port did not do exactly what the app does. None of them changed a stored value: the generator's 100,000-check output is byte-identical before and after each fix. Each would have mattered for other inputs.
+
+- `sig2()` sent a value lying exactly on a tie to the even digit (`'%.2g'`), where the app's `toPrecision(2)` rounds it away from zero: 12.5 gave 12, not 13.
+- `fnv1a()` hashed Unicode code points, where the app hashes UTF-16 code units, so a character beyond the Basic Multilingual Plane (an emoji) gave another digest. PostgreSQL's `fnv1a()` also hashes code points; it agrees with the app for every other character, and a canonical record is ASCII.
+- The upstream-area scale used `log10(1001)`, where the app divides `Math.log(1001)` by `Math.LN10`. The two are one unit in the last place apart, so 214 of the 256 decoded areas differed in their last digits.
+
+**Two measured differences that remain.**
+
+- `encroached` is read from a mask the browser shrinks from 2,048 to 1,024 pixels with its own smoothing, which Pillow's resize only approximates: up to 0.53 apart. It changes the reasons of 2 of the 100,000 checks, where Python's reading crossed the 0.1 that `decide()` uses for "construction on a former bed" and the app's did not.
+- R9 sums step lengths stored to 0.1 m, so its totals can be up to 1.3 m off the app's whole-metre figures (11,735 routes). It also judges the ground its first step leaves by the plot's own height above drainage, because the cell a route starts from is not stored, while `traceDownstream()` reads that 90 m cell. On 4,936 routes (5.0%) the two disagree, which moves R9's low-ground length by one step (90-130 m). Storing that cell's height with the route would make R9 exact.
+
+## 8. Reproduce
 
 ```bash
 createdb bluetrace_big

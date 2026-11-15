@@ -1,6 +1,6 @@
 # Query plans (CP4)
 
-The raw output behind [`../05_query_timings.md`](../05_query_timings.md): every timing in that document can be checked against a file here. [`../time_queries.sh`](../time_queries.sh) writes the files, and section 7 of the timings document has the commands.
+The raw output behind [`../05_query_timings.md`](../05_query_timings.md): every timing in that document can be checked against a file here. [`../time_queries.sh`](../time_queries.sh) writes the files, and section 8 of the timings document has the commands.
 
 | Path | Content |
 |------|---------|
