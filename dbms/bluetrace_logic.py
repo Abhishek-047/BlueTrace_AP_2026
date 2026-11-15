@@ -113,10 +113,13 @@ def metres_between(lon1, lat1, lon2, lat2):
 
 
 def fnv1a(s):
-    """fnv1a(): 32-bit FNV-1a, upper-case hex."""
+    """fnv1a(): 32-bit FNV-1a, upper-case hex, over UTF-16 code units. The app walks
+    str.charCodeAt(i), so a character beyond the Basic Multilingual Plane (an
+    emoji) counts as its two surrogate halves, not as one code point."""
     h = 0x811c9dc5
-    for ch in s:
-        h ^= ord(ch)
+    units = s.encode('utf-16-le', 'surrogatepass')
+    for i in range(0, len(units), 2):
+        h ^= units[i] | (units[i + 1] << 8)
         h = (h + (h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24)) & 0xFFFFFFFF
     return '%08X' % h
 
