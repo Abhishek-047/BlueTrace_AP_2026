@@ -282,6 +282,8 @@ def load_stored(db, n, rng):
     while len(ids) < target:
         ids.add(rng.randint(EXAMPLES + 1, max_id))
     ids = sorted(ids)
+    if not ids:                                   # only the app's own data is loaded
+        return certs, [], {}, {}
     rows = [json.loads(x) for x in psql(db, STORED % ', '.join(map(str, ids)))]
     script = []
     for i in ids:
@@ -307,6 +309,9 @@ def check_stored(db, rep, layers, certs, rows, r8, r9, cert_digests, contexts):
     rep.line('certificates: stored = SQL = Python = app', len(certs), bad,
              'every canonical record ASCII' if ascii_only else 'NON-ASCII canonical records present')
 
+    if not rows:
+        print('  no generated plot checks to sample (load them with generate_workload.py)')
+        return
     bad_m, bad_upa, bad_route, bad_r8, bad_r9, bad_reasons, by_encroached, enc_max = [], [], [], [], [], [], [], 0.0
     r9_rounding = r9_first = 0
     r9_gap = 0.0
