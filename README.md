@@ -413,6 +413,7 @@ configuration, not a legal determination by this tool.</sub>
 | `dbms/generate_workload.py` | 100,000 realistic plot checks for timing: measured from the app's raster layers, judged by `decide()`, traced downhill, a quarter certified |
 | `dbms/time_queries.sh` | Times every query of `04_queries.sql` the way CHECKPOINTS.md asks |
 | `dbms/bluetrace_logic.py` | The parts of `index.html` the scripts port: `decide()`, `fnv1a()`, `readSite()`, `traceDownstream()` |
+| `dbms/check_ports.py` | Runs the app's own JavaScript in headless Chromium and checks that those ports give the same results; with `--db`, also checks the stored plot checks, every certificate, and R8 / R9 against the app |
 
 Build the database (PostgreSQL 15 or newer, `timezone` Asia/Kolkata):
 
@@ -432,4 +433,10 @@ Time the queries on a realistic volume (CP4; details in `dbms/05_query_timings.m
 ```bash
 python3 dbms/generate_workload.py --screenings 100000 --seed 2026 | psql -d bluetrace -v ON_ERROR_STOP=1
 ./dbms/time_queries.sh bluetrace                  # -> dbms/plans/
+```
+
+Check that the generated rows are what the app itself computes (needs `node` and Playwright with Chromium: `npm install playwright && npx playwright install chromium`):
+
+```bash
+python3 dbms/check_ports.py --db bluetrace        # last line: "All checks agree."
 ```

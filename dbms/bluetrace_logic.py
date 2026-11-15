@@ -4,6 +4,8 @@ produce. Standard library + Pillow (for reading the PNG layers) only.
 
 Reference data is parsed out of index.html and data/corpus.json at import time,
 never retyped, so the scripts fail loudly if the app changes underneath them.
+check_ports.py runs the app's own JavaScript on the same inputs and checks that
+every function below gives the same result.
 
     CITIES, RULESETS, OUTCOME_TITLE, OUTCOME_RANK, CODE_CHUNK, CODE_OUTCOME, PARAMS
     decide_(m, rule)           decide()            (index.html line 2802)
