@@ -273,14 +273,15 @@ def psql(db, sql):
 
 
 def query(qid, screening_id):
-    """A query of 04_queries.sql exactly as time_queries.sh runs it, for another screening."""
+    """A query of 04_queries.sql exactly as time_queries.sh runs it, for another
+    screening (a number, or $1 for a prepared statement)."""
     text, keep = [], False
     for line in (HERE / '04_queries.sql').read_text().splitlines():
         if line.startswith('-- @'):
             keep = line.split()[1] == '@' + qid
         elif keep and not line.startswith('--'):
             text.append(line)
-    sql, n = re.subn(r'screening_id = \d+', 'screening_id = %d' % screening_id, '\n'.join(text))
+    sql, n = re.subn(r'screening_id = \d+', 'screening_id = %s' % screening_id, '\n'.join(text))
     if n != 1:
         sys.exit('expected one screening id in %s, found %d' % (qid, n))
     return sql.strip().rstrip(';')
@@ -298,11 +299,12 @@ def load_stored(db, n, rng):
     if not ids:                                   # only the app's own data is loaded
         return certs, [], {}, {}
     rows = [json.loads(x) for x in psql(db, STORED % ', '.join(map(str, ids)))]
-    script = []
-    for i in ids:
-        script.append("SELECT json_build_object('id', %d, 'row', row_to_json(q)) FROM (%s) q;" % (i, query('R8', i)))
-        script.append("SELECT json_build_object('id', %d, 'rows', coalesce(json_agg(row_to_json(q) ORDER BY q.step_no), "
-                      "'[]')) FROM (%s) q;" % (i, query('R9', i)))
+    # each query prepared once with the screening id as its parameter, then run per check
+    script = ["PREPARE r8(bigint) AS SELECT json_build_object('id', $1, 'row', row_to_json(q)) FROM (%s) q;"
+              % query('R8', '$1'),
+              "PREPARE r9(bigint) AS SELECT json_build_object('id', $1, 'rows', "
+              "coalesce(json_agg(row_to_json(q) ORDER BY q.step_no), '[]')) FROM (%s) q;" % query('R9', '$1')]
+    script += ['EXECUTE r8(%d); EXECUTE r9(%d);' % (i, i) for i in ids]
     out = [json.loads(x) for x in psql(db, '\n'.join(script))]
     r8 = {o['id']: o['row'] for o in out if 'row' in o}
     r9 = {o['id']: o['rows'] for o in out if 'rows' in o}
@@ -410,7 +412,8 @@ def main():
     ap.add_argument('--seed', type=int, default=7)
     ap.add_argument('--node', default=shutil.which('node') or 'node')
     ap.add_argument('--db', help='also check the plot checks and certificates stored in this database')
-    ap.add_argument('--sample', type=int, default=2000, help='plot checks to sample with --db (default 2000)')
+    ap.add_argument('--sample', type=int, default=2000,
+                    help='generated plot checks to sample with --db (default 2000; 100000 takes them all)')
     args = ap.parse_args()
     if args.plots < 1 or args.grid < 1 or args.sample < 0:
         ap.error('--plots and --grid must be at least 1, --sample at least 0')
