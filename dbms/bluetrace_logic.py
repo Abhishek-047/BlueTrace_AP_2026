@@ -16,6 +16,7 @@ never retyped, so the scripts fail loudly if the app changes underneath them.
 """
 import json
 import math
+from decimal import ROUND_HALF_UP, Decimal
 import pathlib
 import re
 import sys
@@ -93,12 +94,15 @@ UNCERTAINTY_M = PARAMS.get('uncertaintyM', 20)
 
 # ------------------------------------------------------------------ arithmetic helpers
 def sig2(x):
-    """sig2(): two significant figures."""
+    """sig2(): two significant figures, as parseFloat(x.toPrecision(2)). toPrecision
+    rounds the exact value of the double and sends a tie away from zero; '%.2g'
+    would send it to the even digit (0.125 -> 0.12, where the app shows 0.13)."""
     if x is None or not math.isfinite(x):
         return None
     if x == 0:
         return 0
-    return float('%.2g' % x)
+    d = Decimal(x)                                    # the exact value of the double
+    return float(d.quantize(Decimal(1).scaleb(d.adjusted() - 1), rounding=ROUND_HALF_UP))
 
 
 def metres_between(lon1, lat1, lon2, lat2):
