@@ -225,7 +225,10 @@ D8_MOUTH, D8_DEPRESSION = 9, 10
 MERIT_DEG = 1 / 1200
 PROBE_METRES = 35
 SAMPLE_MAX_W = 1024
-UPA_DEN = math.log10(1 + PARAMS['upaCeilKm2'])
+# Exactly as index.html computes it (line 1416): Math.log(1 + ceil) / Math.LN10.
+# log10() gives a result one unit in the last place away, and every decoded
+# upstream area would differ with it.
+UPA_DEN = math.log(1 + PARAMS['upaCeilKm2']) / math.log(10)
 
 
 def decode_upa(code):
