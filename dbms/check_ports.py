@@ -49,6 +49,7 @@ falls in; the report counts both effects and fails on any other difference.
 Needs node, and Playwright with Chromium. Exit status 0 when everything agrees.
 """
 import argparse
+import atexit
 import json
 import math
 import pathlib
@@ -168,15 +169,27 @@ def decide_grid(rng, n):
 
 
 # ------------------------------------------------------------------ the check
-def run_app(inputs, node):
-    with tempfile.TemporaryDirectory() as tmp:
-        fin, fout = pathlib.Path(tmp, 'in.json'), pathlib.Path(tmp, 'out.json')
-        fin.write_text(json.dumps(inputs))
-        r = subprocess.run([node, str(HERE / 'check_ports_browser.js'), str(APP), str(fin), str(fout)])
-        if r.returncode != 0:
-            sys.exit('check_ports_browser.js failed (exit %d); it needs node and Playwright with Chromium'
-                     % r.returncode)
-        return json.loads(fout.read_text())
+def json_lines(path):
+    with open(path, encoding='utf-8') as f:
+        for line in f:
+            yield json.loads(line)
+
+
+def run_app(inputs, node, tmp):
+    """Runs check_ports_browser.js. The per-plot results come back one per line;
+    the siteContext() results are read only as they are compared, so a whole
+    database can be checked without holding them all in memory."""
+    fin, fout = pathlib.Path(tmp, 'in.json'), pathlib.Path(tmp, 'out.json')
+    fin.write_text(json.dumps(inputs))
+    r = subprocess.run([node, str(HERE / 'check_ports_browser.js'), str(APP), str(fin), str(fout)])
+    if r.returncode != 0:
+        sys.exit('check_ports_browser.js failed (exit %d); it needs node and Playwright with Chromium'
+                 % r.returncode)
+    app = json.loads(fout.read_text())
+    plots = list(json_lines(str(fout) + '.plots'))
+    app['sites'], app['siteVerdicts'], app['traces'] = ([p[i] for p in plots] for i in range(3))
+    app['contexts'] = json_lines(str(fout) + '.contexts')
+    return app
 
 
 def same_number(a, b):
@@ -420,7 +433,9 @@ def main():
 
     print('Python ports (dbms/bluetrace_logic.py) against the app (blue-grid/index.html) in headless Chromium;')
     print('examples of a difference are shown as (input, app, Python)')
-    app = run_app(inputs, args.node)
+    tmp = tempfile.mkdtemp(prefix='check_ports_')
+    atexit.register(shutil.rmtree, tmp, True)
+    app = run_app(inputs, args.node, tmp)
     rep = Report()
     if app['pageErrors']:
         print('  note: the app reported %d error(s) while starting without its map: %s'
