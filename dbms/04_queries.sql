@@ -195,8 +195,13 @@ WHERE s.screening_id = 6;
 -- @R9
 -- READ R9: the downstream panel - the traced route, step by step, with running totals
 -- Replaces: traceDownstream() (line 2541). Each segment is attributed to the
--- ground it LEAVES (the cell read before the step): LAG() gives that cell, and
--- the plot itself for the first step.
+-- ground it LEAVES (the cell read before the step): LAG() gives that cell. The
+-- cell a route starts from is not stored, so for the first step the plot's own
+-- height above drainage stands in for it, where traceDownstream() reads the 90 m
+-- cell the plot falls in. On 4,936 of the 98,080 generated routes (5.0%) the two
+-- disagree about that first step, and low_ground_m_so_far is one step off the
+-- app's figure. Lengths are stored to 0.1 m, so the totals can also be up to
+-- 1.3 m off the app's whole metres (check_ports.py --db; 05_query_timings.md, section 7).
 SELECT x.step_no, x.direction, x.step_length_m,
        sum(x.step_length_m) OVER w AS metres_from_plot,
        x.step_upa_km2, max(x.step_upa_km2) OVER w AS largest_catchment_so_far,
