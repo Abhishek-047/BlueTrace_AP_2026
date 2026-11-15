@@ -76,20 +76,40 @@ async function runInApp(input) {
     const r = decide(out.sites[i], RULESETS[ruleId]);
     return [r.d, r.codes];
   });
-  // each step of the route: the move, its length, and the upstream area and
+  // each step of a route: the move, its length, and the upstream area and
   // height above drainage the app reads at the cell it reaches (route_step's columns)
-  out.traces = input.plots.map(([lon, lat]) => {
-    const t = traceDownstream({ lng: lon, lat: lat });
+  function stepsOf(path) {
     const steps = [];
-    for (let i = 1; i < t.path.length; i++) {
-      const [lon0, lat0] = t.path[i - 1], [lon1, lat1] = t.path[i];
+    for (let i = 1; i < path.length; i++) {
+      const [lon0, lat0] = path[i - 1], [lon1, lat1] = path[i];
       const upaCode = sampleCh(S.hydro, lon1, lat1, b, 0, 'max', 0, 1);
       const hand = sampleCh(S.history, lon1, lat1, b, 2, 'min', 0, 1);
       steps.push([lon1 - lon0, lat1 - lat0, metresBetween(lon0, lat0, lon1, lat1),
                   upaCode === null ? null : sig2(decodeUpa(upaCode)),
                   hand !== null && hand < 255 ? hand : null]);
     }
-    return { endedBy: t.endedBy, steps: steps };
+    return steps;
+  }
+  out.traces = input.plots.map(([lon, lat]) => {
+    const t = traceDownstream({ lng: lon, lat: lat });
+    return { endedBy: t.endedBy, steps: stepsOf(t.path) };
+  });
+  // siteContext(): what the app shows for a plot check, end to end
+  out.contexts = (input.contexts || []).map(([lon, lat, plotM, ruleId, storage]) => {
+    state.plotM = plotM;
+    state.storageLpm2 = storage;
+    const c = siteContext({ lng: lon, lat: lat }, RULESETS[ruleId]), r = c.rec;
+    const rec = {};
+    ['plotAreaM2', 'retreatM', 'flowClass', 'handClass', 'upaKm2', 'runoffDisplacedM3', 'runoffLoM3',
+     'runoffHiM3', 'runoffAnnualM3', 'tankerEquiv', 'retentionRequiredM3', 'rwhRequiredM3',
+     'retentionShortfallM3'].forEach((k) => { rec[k] = r[k]; });
+    // the height above drainage traceDownstream() reads where the route starts:
+    // the centre of the 90 m cell the plot falls in, not the plot itself
+    const h0 = sampleCh(S.history, Math.round(lon / MERIT_DEG) * MERIT_DEG,
+                        Math.round(lat / MERIT_DEG) * MERIT_DEG, b, 2, 'min', 0, 1);
+    return { m: c.m, verdict: [c.verdict.d, c.verdict.codes, c.verdict.why], rec: rec,
+             route: { endedBy: c.route.endedBy, lengthM: c.route.lengthM, lowGroundM: c.route.lowGroundM,
+                      originHand: h0 !== null && h0 < 255 ? h0 : null, steps: stepsOf(c.route.path) } };
   });
   out.decisions = input.decide.map(([m, ruleId]) => {
     const r = decide(m, RULESETS[ruleId]);
