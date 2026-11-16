@@ -356,6 +356,17 @@ HTML file you can open and read top to bottom.
 
 ## Running it
 
+You can run the service with either the Python server or the Node.js / Express DBMS server:
+
+**Option A · Node.js & Express (with DBMS integration):**
+```bash
+cd blue-grid
+npm install
+npm start                                                      # runs on http://localhost:8000
+```
+This serves the frontend, provides `/api/health`, `/api/screenings`, and integrates directly with PostgreSQL (`dbms/03_schema.sql`) when available.
+
+**Option B · Python:**
 ```bash
 cd blue-grid
 python3 server.py                                              # answers stay local
