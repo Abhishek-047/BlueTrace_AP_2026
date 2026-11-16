@@ -113,7 +113,7 @@
      queue collapses so the dock reclaims the room rather than staying offset
      against a rail that is no longer there. */
   --rail-l:324px;
-  --rail-r:364px;
+  --rail-r:384px;
 }
 
 *{box-sizing:border-box;margin:0;padding:0}
@@ -308,6 +308,12 @@ select:focus-visible{border-color:var(--focus);box-shadow:0 0 0 3px var(--focus-
   font-variant-numeric:tabular-nums}
 
 #list{padding:6px;max-height:100%}
+#leftFilterWrap{padding:6px 8px 4px;border-bottom:1px solid var(--line);background:var(--card)}
+#leftFilter{width:100%;background:var(--sunken);border:1px solid var(--line);border-radius:var(--r-sm);
+  padding:5px 8px;font:400 11.5px/1.4 var(--sans);color:var(--text);outline:none;
+  transition:border-color .15s}
+#leftFilter:focus{border-color:var(--focus);box-shadow:0 0 0 2px var(--focus-ring)}
+#leftFilter::placeholder{color:var(--faint)}
 .item{display:flex;align-items:center;gap:10px;padding:9px;border-radius:var(--r-sm);
   cursor:pointer;border:1px solid transparent;transition:background .14s,border-color .14s}
 .item:hover{background:var(--sunken)}
@@ -333,7 +339,7 @@ select:focus-visible{border-color:var(--focus);box-shadow:0 0 0 3px var(--focus-
    was measured, what you can do about it.
    =========================================================================== */
 #right{position:absolute;right:var(--pad);top:calc(var(--pad) + var(--topbar-h) + 10px);
-  width:336px;z-index:20;max-height:calc(100vh - var(--topbar-h) - 190px);
+  width:356px;z-index:20;max-height:calc(100vh - var(--topbar-h) - 170px);
   display:flex;flex-direction:column;gap:10px;overflow:visible}
 #rightScroll{display:flex;flex-direction:column;gap:10px;overflow-y:auto;min-height:0;
   padding-right:3px;margin-right:-3px}
@@ -1036,6 +1042,9 @@ kbd{font:500 9.5px/1 var(--mono);color:var(--faint);border:1px solid var(--line)
     <button class="iconbtn" id="queueHide" title="Hide">
       <svg width="13" height="13" viewBox="0 0 14 14" fill="none"><path d="M4 2.5L8.5 7 4 11.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
     </button>
+  </div>
+  <div id="leftFilterWrap">
+    <input id="leftFilter" placeholder="Filter by locality or structure…" autocomplete="off" spellcheck="false">
   </div>
   <div class="scroll" id="list"></div>
 </aside>
@@ -3371,12 +3380,12 @@ function selectBuilding(f){
                        rule: rule, at: new Date()};
   }
   var r = p.verdict==='RED_FORMER_WATER_BODY'
-      ? {c:'reject', t:'BUILT ON FORMER WATER BODY', short:'On former water',
+      ? {c:'reject', t:'BUILT ON FORMER WATER BODY', short:'Former water',
          s:'Footprint overlaps land classified as surface water before 2000.'}
     : p.verdict==='RED_BLOCKS_DRAINAGE'
-      ? {c:'conditions', t:'BLOCKS A NATURAL DRAINAGE PATH', short:'Blocks drainage',
+      ? {c:'conditions', t:'BLOCKS A NATURAL DRAINAGE PATH', short:'Blocks path',
          s:'Footprint sits on a terrain channel carrying upstream runoff.'}
-      : {c:'conditions', t:'PARTIAL OVERLAP', short:'Partial overlap',
+      : {c:'conditions', t:'PARTIAL OVERLAP', short:'Partial',
          s:'Part of the footprint falls on former water or a drainage path.'};
 
   // A flagged footprint carries its own per-polygon measurements, computed in
@@ -5132,6 +5141,8 @@ function renderList(){
   var host = document.getElementById('list'), c = CITIES[state.city];
   var title = document.getElementById('leftTitle');
   var count = document.getElementById('leftCount');
+  var filterInput = document.getElementById('leftFilter');
+  var q = (filterInput && filterInput.value ? filterInput.value.trim().toLowerCase() : '');
 
   function mark(el){
     host.querySelectorAll('.item').forEach(function(x){ x.classList.remove('on'); });
@@ -5139,36 +5150,57 @@ function renderList(){
   }
 
   if(state.buildings && state.buildings.features.length){
-    var fs = state.buildings.features.slice().sort(function(a,b){
-      return b.properties.risk_score - a.properties.risk_score; }).slice(0,40);
-    // "Offenders" was the wrong word on two counts. Nothing here identifies an
-    // owner \u2014 refusal.cannot-identify-owner says so in every answer \u2014 and the
-    // list is a removal-priority queue, ordered by how much catchment each
-    // structure blocks, not an accusation against whoever lives in one.
+    var all = state.buildings.features.slice().sort(function(a,b){
+      return b.properties.risk_score - a.properties.risk_score;
+    });
+
+    // Attach human label once
+    all.forEach(function(f){
+      if(!f._label){
+        var ctr = centroidOf(f);
+        var near = ctr ? nearestSettlement(ctr[0], ctr[1], 1600) : null;
+        f._label = near
+          ? near.place.name + ' \u00b7 ' + Math.round(f.properties.area_in_meters) + ' m\u00b2'
+          : Math.round(f.properties.area_in_meters) + ' m\u00b2 structure';
+      }
+    });
+
+    var fs = q ? all.filter(function(f){
+      return f._label.toLowerCase().indexOf(q) !== -1 ||
+             f.properties.verdict.toLowerCase().indexOf(q) !== -1;
+    }).slice(0, 40) : all.slice(0, 40);
+
     title.textContent = 'Flagged structures';
-    count.textContent = state.buildings.features.length;
+    count.textContent = fs.length + (q ? ' of ' + all.length : '');
     count.style.display = '';
+
+    if(!fs.length){
+      host.innerHTML = '<div class="empty">No structures match "' + esc(q) + '"</div>';
+      return;
+    }
+
     host.innerHTML = fs.map(function(f,i){
       var p = f.properties;
       var col = p.verdict==='RED_FORMER_WATER_BODY' ? PALETTE.encroached
               : p.verdict==='RED_BLOCKS_DRAINAGE' ? PALETTE.flowpath : '#6b7280';
-      // Forty rows all reading "<n> m\u00b2 structure" are forty rows that cannot be
-      // told apart, and the officer has to click each one to find out where it
-      // is. The nearest locality is the only human handle this layer can
-      // honestly carry \u2014 it holds no name, khata or survey number, and
-      // inventing one is the thing refusal.cannot-identify-owner exists to
-      // stop. The area stays, as the thing that distinguishes two rows in the
-      // same locality.
-      var c = centroidOf(f);
-      var near = c ? nearestSettlement(c[0], c[1], 1600) : null;
-      var label = near
-        ? near.place.name + ' \u00b7 ' + Math.round(p.area_in_meters) + ' m\u00b2'
-        : Math.round(p.area_in_meters) + ' m\u00b2 structure';
       return '<div class="item" data-i="'+i+'">'+
         '<span class="rank">'+(i+1)+'</span>'+
         '<span class="dot" style="background:'+col+'"></span>'+
-        '<span class="body"><span class="nm">'+esc(label)+'</span>'+
+        '<span class="body"><span class="nm">'+esc(f._label)+'</span>'+
         '<span class="sub">'+(+p.upstream_km2).toFixed(2)+' km\u00b2 upstream \u00b7 '
+          +(+p.hand_m).toFixed(1)+' m above drain</span></span>'+
+        '<span class="sc">'+(+p.risk_score).toFixed(0)+'</span></div>';
+    }).join('');
+    host.querySelectorAll('.item').forEach(function(el){
+      el.onclick = function(){
+        var f = fs[+el.dataset.i];
+        mark(el);
+        map.flyTo({center: centroidOf(f), zoom:17.2, duration:1800});
+        if(state.mode==='timeline'){ stop(); state.t=1; slider.value=100; update(); }
+        selectBuilding(f);
+      };
+    });
+  } else {
           +(+p.hand_m).toFixed(1)+' m above drain</span></span>'+
         '<span class="sc">'+(+p.risk_score).toFixed(0)+'</span></div>';
     }).join('');
@@ -5208,6 +5240,11 @@ function renderList(){
       };
     });
   }
+}
+
+var filterEl = document.getElementById('leftFilter');
+if(filterEl){
+  filterEl.oninput = function(){ renderList(); };
 }
 
 // The complaint this redesign started from was that two decades of water were
