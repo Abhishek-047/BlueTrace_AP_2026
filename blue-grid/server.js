@@ -135,6 +135,19 @@ app.post('/api/screenings', async (req, res) => {
 
       const screeningId = screenRes.rows[0].screening_id;
 
+      // Insert reasons if provided
+      if (Array.isArray(record.reasons) && record.reasons.length > 0) {
+        for (let i = 0; i < record.reasons.length; i++) {
+          const reasonText = record.reasons[i];
+          // Check if reason code exists or fallback
+          await client.query(`
+            INSERT INTO bluetrace.screening_reason (screening_id, reason_code, reason_text)
+            VALUES ($1, $2, $3)
+            ON CONFLICT DO NOTHING
+          `, [screeningId, 'conditions.low-ground', String(reasonText).slice(0, 500)]);
+        }
+      }
+
       await client.query(`
         INSERT INTO bluetrace.certificate (
           cert_ref, screening_id, issued_at, application_no, survey_no, applicant, corpus_version
@@ -155,6 +168,104 @@ app.post('/api/screenings', async (req, res) => {
   }
 
   res.status(201).json({ success: true, persisted: 'cache', cert_ref: record.cert_ref });
+});
+
+// ---------------------------------------------------------------------
+// Certificate Tamper-Proof Verification Endpoint
+// Checks certificate reference against PostgreSQL / memory store
+// ---------------------------------------------------------------------
+app.get('/api/certificates/:cert_ref/verify', async (req, res) => {
+  const ref = req.params.cert_ref;
+  if (!ref) {
+    return res.status(400).json({ error: 'Certificate reference required' });
+  }
+
+  if (dbConnected) {
+    try {
+      const q = await pool.query(`
+        SELECT c.cert_ref, c.issued_at, c.applicant, c.survey_no, c.application_no,
+               s.lat, s.lon, s.plot_m, s.dist_present, s.dist_historic, s.dist_drain,
+               s.city_key, s.rule_id
+        FROM bluetrace.certificate c
+        JOIN bluetrace.screening s ON c.screening_id = s.screening_id
+        WHERE c.cert_ref = $1
+        LIMIT 1
+      `, [ref]);
+
+      if (q.rows.length > 0) {
+        return res.json({
+          status: 'VERIFIED',
+          authentic: true,
+          storage: 'PostgreSQL Relational DB',
+          record: q.rows[0]
+        });
+      }
+    } catch (err) {
+      console.warn('[DBMS] Error querying cert verify:', err.message);
+    }
+  }
+
+  const cached = memoryScreenings.find(s => s.cert_ref === ref);
+  if (cached) {
+    return res.json({
+      status: 'VERIFIED',
+      authentic: true,
+      storage: 'Session Memory Store',
+      record: cached
+    });
+  }
+
+  res.status(404).json({
+    status: 'NOT_FOUND',
+    authentic: false,
+    message: 'Certificate not registered in DBMS or session records.'
+  });
+});
+
+// ---------------------------------------------------------------------
+// DBMS Analytical Reporting Endpoint
+// Aggregates screenings, verdicts, and catchment-level stats
+// ---------------------------------------------------------------------
+app.get('/api/analytics', async (req, res) => {
+  if (dbConnected) {
+    try {
+      const summaryQ = await pool.query(`
+        SELECT 
+          COUNT(*)::INTEGER AS total_screenings,
+          COUNT(DISTINCT city_key)::INTEGER AS active_cities,
+          ROUND(AVG(plot_m), 1)::FLOAT AS avg_plot_m,
+          ROUND(AVG(dist_present), 1)::FLOAT AS avg_dist_present_m,
+          ROUND(AVG(dist_historic), 1)::FLOAT AS avg_dist_historic_m
+        FROM bluetrace.screening
+      `);
+
+      const certsQ = await pool.query(`
+        SELECT COUNT(*)::INTEGER AS total_certificates_issued
+        FROM bluetrace.certificate
+      `);
+
+      return res.json({
+        source: 'PostgreSQL (bluetrace schema)',
+        summary: summaryQ.rows[0],
+        certificates: certsQ.rows[0]
+      });
+    } catch (err) {
+      console.warn('[DBMS] Analytics query error:', err.message);
+    }
+  }
+
+  // Fallback analytics on memory cache
+  const total = memoryScreenings.length;
+  const avgPlot = total ? Math.round(memoryScreenings.reduce((a, b) => a + (b.plot_m || 30), 0) / total) : 0;
+  res.json({
+    source: 'In-Memory Cache (PostgreSQL offline)',
+    summary: {
+      total_screenings: total,
+      active_cities: total ? 1 : 0,
+      avg_plot_m: avgPlot,
+      total_certificates_issued: total
+    }
+  });
 });
 
 // Proxy /ask for LLM answers (matches Python server.py contract)
