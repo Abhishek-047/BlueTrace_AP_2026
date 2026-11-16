@@ -9,8 +9,14 @@
   <a href="https://bluetrace-1oys.onrender.com"><img src="https://img.shields.io/badge/live-demo-0e9cbf?style=flat-square&labelColor=0b0e15&logo=render&logoColor=white" alt="live demo"></a>
 </p>
 
-**AP project 2026 · Team T0015 (Bluetrace), Section E** · Aadi Kalra, Tushar Khemka, Rudransh Singh, Abhishek Panigrahi
+*AP project 2026 · Team T0015 (Bluetrace), Section E*
 
+| Role | Name | Enrollment No. | GitHub |
+|------|------|----------------|--------|
+| Group Lead | Aadi Kalra | 2501010002 | [RedRangerWentWild](https://github.com/RedRangerWentWild) |
+| Member | Tushar Khemka | 2501010482 | [thetusharkhemka](https://github.com/thetusharkhemka) |
+| Member | Rudransh Singh | 2501010390 | [rayrudr1817](https://github.com/rayrudr1817) |
+| Member | Abhishek Panigrahi | 2501010019 | [Abhishek-047](https://github.com/Abhishek-047) |
 **Reconstructs a city's lost water bodies from the satellite record, then flags
 the buildings sitting on them, traces where their runoff goes, and states what
 the land could hold instead.**
