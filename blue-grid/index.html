@@ -515,6 +515,14 @@ select:focus-visible{border-color:var(--focus);box-shadow:0 0 0 3px var(--focus-
 .foldbody .metric .k{font-size:11px}
 .foldbody .metric .v{font-size:11.5px}
 
+/* Database status pill */
+#dbStatusPill{display:flex;align-items:center;gap:6px;font:550 11px/1 var(--sans);
+  padding:5px 9px;border-radius:20px;background:var(--sunken);border:1px solid var(--line);
+  color:var(--dim);user-select:none}
+#dbStatusDot{width:6.5px;height:6.5px;border-radius:50%;background:var(--faint);transition:background .25s}
+#dbStatusDot.live{background:#2da44e;box-shadow:0 0 6px rgba(45,164,78,.5)}
+#dbStatusDot.cached{background:#d0862b}
+
 .vactions{padding:13px 14px;display:flex;flex-direction:column;gap:8px}
 .vactions .btn{width:100%}
 
@@ -991,6 +999,14 @@ kbd{font:500 9.5px/1 var(--mono);color:var(--faint);border:1px solid var(--line)
   </div>
 
   <div id="topRight">
+    <div id="dbStatusPill" title="DBMS backend status">
+      <span id="dbStatusDot"></span>
+      <span id="dbStatusText">DBMS</span>
+    </div>
+    <button class="btn ghost" id="historyBtn" title="View previously issued certificates and DBMS records">
+      <svg width="13" height="13" viewBox="0 0 14 14" fill="none"><path d="M7 2.5a4.5 4.5 0 104.24 3H9.5M7 4.5v3l2 1.2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <span>Records</span>
+    </button>
     <button class="btn ghost" id="validateBtn" title="How this compares with the municipal record">
       <svg width="13" height="13" viewBox="0 0 14 14" fill="none"><path d="M7 1.2l4.6 2v3.9c0 2.8-1.9 4.7-4.6 5.7-2.7-1-4.6-2.9-4.6-5.7V3.2L7 1.2z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M5 7l1.5 1.5L9.4 5.6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
       <span>Validation</span>
@@ -3809,10 +3825,46 @@ function renderCertificate(ck, snap){
         + 'grants nor refuses permission.</p>' +
 
       '<button class="btn primary noprint" id="printCert" style="width:100%;justify-content:center;margin-top:18px">Print / save as PDF</button>' +
+      '<button class="btn ghost noprint" id="exportCertJson" style="width:100%;justify-content:center;margin-top:8px">Export certificate JSON</button>' +
     '</div>';
 
   document.getElementById('modal').classList.add('on');
   document.getElementById('printCert').onclick = function(){ window.print(); };
+
+  // Save certificate to backend / DBMS
+  saveCertificateRecord({
+    cert_ref: ref,
+    issued_at: iso,
+    city_key: state.city,
+    rule_id: rule.id,
+    lat: lat,
+    lon: lon,
+    plot_m: state.plotM,
+    dist_present: m.distPresent,
+    dist_historic: m.distHistoric,
+    dist_drain: m.distDrain,
+    verdict: OUTCOME[out.d].t,
+    reasons: out.why
+  });
+
+  document.getElementById('exportCertJson').onclick = function(){
+    var blob = new Blob([JSON.stringify({
+      cert_ref: ref,
+      issued_at: iso,
+      canonical: canon,
+      city: state.city,
+      rule: rule,
+      plot_m: state.plotM,
+      measurements: m,
+      verdict: OUTCOME[out.d].t,
+      reasons: out.why
+    }, null, 2)], {type: 'application/json'});
+    var u = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = u; a.download = ref.replace(/[\/]/g, '_') + '.json';
+    a.click(); URL.revokeObjectURL(u);
+  };
+
   // A typed value lives only in the DOM property, which print ignores.
   // Mirroring it to the attribute is what makes it appear on paper.
   Array.prototype.forEach.call(document.querySelectorAll('.cin'), function(el){
@@ -5653,6 +5705,82 @@ document.addEventListener('keydown', function(e){
   }
   if(e.key===' '){ e.preventDefault(); document.getElementById('play').click(); }
 });
+
+// ===========================================================================
+// DBMS & CERTIFICATE PERSISTENCE CLIENT INTEGRATION
+// ===========================================================================
+function checkDbmsStatus(){
+  var dot = document.getElementById('dbStatusDot');
+  var txt = document.getElementById('dbStatusText');
+  if(!dot || !txt) return;
+
+  fetch('api/health').then(function(r){
+    if(!r.ok) throw new Error('status ' + r.status);
+    return r.json();
+  }).then(function(data){
+    if(data.database && data.database.indexOf('connected') !== -1){
+      dot.className = 'live';
+      dot.title = 'DBMS PostgreSQL is connected and recording live.';
+      txt.textContent = 'PostgreSQL';
+    } else {
+      dot.className = 'cached';
+      dot.title = 'DBMS in-memory fallback active (' + (data.inMemoryStored || 0) + ' stored).';
+      txt.textContent = 'Memory DB';
+    }
+  }).catch(function(){
+    dot.className = '';
+    dot.title = 'Offline mode (browser client-only)';
+    txt.textContent = 'Offline';
+  });
+}
+
+function saveCertificateRecord(rec){
+  fetch('api/screenings', {
+    method: 'POST',
+    headers: {'content-type': 'application/json'},
+    body: JSON.stringify(rec)
+  }).then(function(r){
+    if(r.ok) checkDbmsStatus();
+  }).catch(function(){});
+}
+
+document.getElementById('historyBtn').onclick = function(){
+  fetch('api/screenings').then(function(r){
+    if(!r.ok) throw new Error('status ' + r.status);
+    return r.json();
+  }).then(function(data){
+    var items = data.items || [];
+    var html = '<h2>Screening Certificate Records</h2>'
+      + '<div class="lede">Certificates issued and tracked in the relational DBMS / session store ('
+      + data.source + ').</div>';
+
+    if(!items.length){
+      html += '<div class="case"><div class="t">No certificates recorded yet</div><div class="d">Check any plot in "Plot check" mode and click "Certificate" to issue and store records in PostgreSQL.</div></div>';
+    } else {
+      html += '<div style="display:flex;flex-direction:column;gap:10px">';
+      items.forEach(function(it){
+        html += '<div class="case" style="border:1px solid var(--line);padding:12px;border-radius:8px">'
+          + '<div class="t" style="font-family:var(--mono);color:var(--v-conditions)">' + (it.cert_ref || 'Certificate') + '</div>'
+          + '<div class="d">Issued: ' + (it.issued_at ? it.issued_at.replace('T', ' ').slice(0, 19) : '—')
+          + ' | Coordinates: ' + Number(it.lat).toFixed(4) + ', ' + Number(it.lon).toFixed(4)
+          + ' | Rule: ' + (it.rule_id || 'ngt').toUpperCase()
+          + (it.dist_present != null ? (' | Water: ' + it.dist_present + ' m') : '')
+          + '</div></div>';
+      });
+      html += '</div>';
+    }
+
+    document.getElementById('sheet').innerHTML = html;
+    document.getElementById('modal').classList.add('on');
+  }).catch(function(err){
+    document.getElementById('sheet').innerHTML = '<h2>Screening Records</h2><div class="lede">No active backend or stored records found for this session.</div>';
+    document.getElementById('modal').classList.add('on');
+  });
+};
+
+// Check health on boot
+setTimeout(checkDbmsStatus, 1000);
+
 </script>
 </body>
 </html>
