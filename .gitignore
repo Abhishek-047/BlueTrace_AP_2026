@@ -1,6 +1,8 @@
 .DS_Store
 .claude/
 __pycache__/
+node_modules/
+package-lock.json
 
 # data/<city>/flagged_buildings.geojson IS tracked. It is a per-run Earth
 # Engine export and was ignored on that reasoning, but the hosted demo is a

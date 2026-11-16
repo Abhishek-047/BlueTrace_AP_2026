@@ -1,0 +1,17 @@
+{
+  "name": "bluetrace-server",
+  "version": "1.0.0",
+  "description": "Node.js Express backend and DBMS integration API for BlueTrace",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node -e \"console.log('API check OK')\""
+  },
+  "keywords": ["hydrology", "screening", "postgres", "express", "bluetrace"],
+  "author": "Abhishek Panigrahi",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.21.2",
+    "pg": "^8.13.1"
+  }
+}
