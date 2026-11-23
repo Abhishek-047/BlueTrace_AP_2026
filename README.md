@@ -478,3 +478,13 @@ python3 dbms/check_ports.py --db bluetrace        # last line: "All checks agree
 | `GET /api/certificates/:cert_ref/verify` | Checks a certificate against its stored digest |
 | `GET /api/analytics` | Verdict counts and catchment statistics |
 | `POST /ask` | The question endpoint used by the ask box |
+
+## Configuration
+
+| Variable | Default | Used by |
+|----------|---------|---------|
+| `PORT` | `8000` | both servers |
+| `HOST` | `0.0.0.0` | `server.js` |
+| `DATABASE_URL` | `postgresql://localhost:5432/bluetrace` | `server.js`; without a database it keeps certificates in memory |
+| `BLUETRACE_PROVIDER` | none | `server.py`; `groq` turns on model answers |
+| `GROQ_API_KEY` | none | `server.py`; never commit it |
