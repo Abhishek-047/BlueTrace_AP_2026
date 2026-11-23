@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "Node.js Express backend and DBMS integration API for BlueTrace",
   "main": "server.js",
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "start": "node server.js",
     "test": "node --test test.js"
