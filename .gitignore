@@ -10,3 +10,11 @@ package-lock.json
 # repository is a layer the deployed site does not have. 1.6 MB is a fair
 # price for the ranked list, the per-building panel and the CSV working for
 # anyone who opens the link.
+
+# Local secrets (GROQ_API_KEY etc.) and editor folders. render.yaml keeps the
+# key in the Render dashboard; a local .env must never be committed either.
+.env
+.env.*
+*.pyc
+.vscode/
+.idea/
