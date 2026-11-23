@@ -462,3 +462,8 @@ Check that the generated rows are what the app itself computes (needs `node` and
 ```bash
 python3 dbms/check_ports.py --db bluetrace        # last line: "All checks agree."
 ```
+## Requirements
+
+- Python 3 (standard library only) for `blue-grid/server.py` and the checking scripts
+- Node.js 18 or newer for the optional Express server (`blue-grid/server.js`)
+- PostgreSQL 15 or newer for the DBMS deliverables in `dbms/`
