@@ -488,3 +488,11 @@ python3 dbms/check_ports.py --db bluetrace        # last line: "All checks agree
 | `DATABASE_URL` | `postgresql://localhost:5432/bluetrace` | `server.js`; without a database it keeps certificates in memory |
 | `BLUETRACE_PROVIDER` | none | `server.py`; `groq` turns on model answers |
 | `GROQ_API_KEY` | none | `server.py`; never commit it |
+
+## Running the checks
+
+```bash
+cd blue-grid
+npm test                  # Node test suite (test.js)
+python3 check_corpus.py   # corpus checks; prints "all checks pass"
+```
