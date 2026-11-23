@@ -501,6 +501,3 @@ python3 check_corpus.py   # corpus checks; prints "all checks pass"
 
 The corpus has 86 chunks. 22 of them are drafted but not yet checked against their original source (`verify: true` in the chunk); `python3 blue-grid/check_corpus.py` lists them. Checking those sources is the next piece of work.
 
-## Project status
-
-The corpus has 86 chunks. 22 of them are drafted but not yet checked against their original source (`verify: true` in the chunk); `python3 blue-grid/check_corpus.py` lists them. Checking those sources is the next piece of work.
