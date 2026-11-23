@@ -467,3 +467,14 @@ python3 dbms/check_ports.py --db bluetrace        # last line: "All checks agree
 - Python 3 (standard library only) for `blue-grid/server.py` and the checking scripts
 - Node.js 18 or newer for the optional Express server (`blue-grid/server.js`)
 - PostgreSQL 15 or newer for the DBMS deliverables in `dbms/`
+
+## Node.js server endpoints
+
+| Endpoint | What it does |
+|----------|--------------|
+| `GET /api/health` | Server status and whether the database is connected |
+| `GET /api/screenings` | The 50 most recent certificates |
+| `POST /api/screenings` | Saves a plot check and its certificate |
+| `GET /api/certificates/:cert_ref/verify` | Checks a certificate against its stored digest |
+| `GET /api/analytics` | Verdict counts and catchment statistics |
+| `POST /ask` | The question endpoint used by the ask box |
