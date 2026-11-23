@@ -348,6 +348,9 @@ blue-grid/
   gee_blue_grid.js          extraction — the only thing that touches Earth Engine
   index.html                the whole app: map, screening, routing, retention, certificate
   server.py                 serves the app, holds the API key, proxies one endpoint
+  server.js                 Node.js / Express alternative: the app plus the /api/* DBMS endpoints
+  package.json              its dependencies and `npm start` / `npm test`
+  test.js                   the Node test suite (`npm test`)
   check_corpus.py           eleven checks; refuses to pass if code and corpus disagree
   verify_encoding.py        proves the byte-packed layers decoded losslessly
   validate.py               blockwise held-out scoring, and --routing agreement
