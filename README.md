@@ -434,6 +434,7 @@ configuration, not a legal determination by this tool.</sub>
 | `dbms/time_queries.sh` | Times every query of `04_queries.sql` the way CHECKPOINTS.md asks |
 | `dbms/bluetrace_logic.py` | The parts of `index.html` the scripts port: `decide()`, `fnv1a()`, `readSite()`, `traceDownstream()` |
 | `dbms/check_ports.py` | Runs the app's own JavaScript in headless Chromium and checks that those ports give the same results; with `--db`, also checks the stored plot checks, every certificate, and R8 / R9 against the app |
+| `dbms/check_ports_browser.js` | The Node/Playwright half of `check_ports.py`: runs the app's functions in headless Chromium and writes what they return |
 
 Build the database (PostgreSQL 15 or newer, `timezone` Asia/Kolkata):
 
