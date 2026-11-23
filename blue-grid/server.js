@@ -31,9 +31,15 @@ const pool = new Pool({
 let dbConnected = false;
 
 pool.query('SELECT 1 FROM information_schema.tables WHERE table_schema = $1 LIMIT 1', ['bluetrace'])
-  .then(() => {
-    dbConnected = true;
-    console.log('[DBMS] Connected to PostgreSQL bluetrace schema successfully.');
+  .then((result) => {
+    // The query succeeds on any reachable server; only a returned row means
+    // the bluetrace schema (dbms/03_schema.sql) has actually been loaded.
+    dbConnected = result.rowCount > 0;
+    if (dbConnected) {
+      console.log('[DBMS] Connected to PostgreSQL bluetrace schema successfully.');
+    } else {
+      console.log('[DBMS] PostgreSQL is reachable but has no bluetrace schema (load dbms/03_schema.sql). Using in-memory certificate cache.');
+    }
   })
   .catch((err) => {
     dbConnected = false;
